@@ -67,7 +67,7 @@ class ManHuaGui {
             file = file.replace(/(.*)\.webp$/gi, "$1")
             const fileExt = (/(\.[^\.]+)$/.exec(file))[1]
             return ({
-                filename: 'out/' + mangaData.bname + '/' + mangaData.cname + '/' + (idx + 1) + fileExt,
+                filename: 'out/' + mangaData.bname + '/' + mangaData.cname + '/' + stringify(idx + 1, 10) + fileExt,
                 url: pVars.manga.filePath + file + '?cid=' + mangaData.cid + '&md5=' + mangaData.sl.md5
             });
         })
@@ -81,6 +81,11 @@ class ManHuaGui {
 
         this._setPageDownloaded(url)
     }
+}
+
+function stringify(num, digits) {
+    let str = num.toString()
+    return Array(digits - str.length).fill('0').join('') + str
 }
 
 function createProducer(infos, referer, bar) {
