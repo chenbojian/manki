@@ -7,7 +7,7 @@ const writeFile = util.promisify(fs.writeFile)
 
 class AxiosImageDownloader {
     async download(url, path, headers) {
-        const response = await axios.get(url, {
+        const response = await axios.get(encodeURI(url), {
             headers: headers,
             responseType: 'arraybuffer'
         })
