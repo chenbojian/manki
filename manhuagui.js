@@ -1,4 +1,12 @@
 const fs = require('fs')
+const axios = require('axios')
+const util = require('util')
+
+var ProgressBar = require('progress');
+
+
+const mkdir = util.promisify(fs.mkdir)
+const writeFile = util.promisify(fs.writeFile)
 
 class ManHuaGui {
     constructor(page) {
@@ -35,13 +43,6 @@ class ManHuaGui {
 
     async init() {
         await this.page.goto('https://www.manhuagui.com/')
-        this.page.on('requestfinished', (request) => {
-            if (isImage(request)) {
-                const response = request.response()
-                const url = request.url()
-                this.imageBufferPromises[url] = response.buffer()
-            }
-        })
     }
 
     async downloadAll(url) {
@@ -57,48 +58,70 @@ class ManHuaGui {
             return
         }
         await this.page.goto(url)
-        while (true) {
-            try {
-                await this.page.waitFor(() => document.querySelector('div#imgLoading').style.display === 'none')
-                const imageSrc = await this.page.$eval('img#mangaFile', node => node.src)
-                const title = await this.page.$eval('div.title', node => node.textContent)
-                const buffer = await this.imageBufferPromises[imageSrc]
-                writeFile(buffer, title)
-                if (isLastPage(title)) {
-                    break;
-                }
-                await this.page.click('a#next')
-            } catch (error) {
-                console.error(error)
-                console.error('failed at ', this.page.url())
-                await this.page.screenshot({
-                    path: 'failed-page.png'
-                })
-                await this.page.reload()
-            }
-        }
+        const title = /关灯(.+)\(.+\)/.exec(await this.page.$eval('div.title', node => node.textContent))[1]
+        const mangaData = await this.page.evaluate(() => {
+            SMH.imgData = function(n) { window.mangaData = n }
+            let script = [...document.querySelectorAll('script:not([src])')].filter(s => /window.+fromCharCode/.test(s.innerHTML))[0]
+            let newScript = document.createElement('script')
+            newScript.type = "text\/javascript"
+            newScript.innerHTML = script.innerHTML
+            document.body.append(newScript)          
+            return window.mangaData
+        })
+        const pVars = await this.page.evaluate(() => pVars)
+        const imgInfos = mangaData.files.map((file, idx) => {
+            file = file.replace(/(.*)\.webp$/gi, "$1")
+            const fileExt = (/(\.[^\.]+)$/.exec(file))[1]
+            return ({
+                filename: mangaData.bname + '/' + mangaData.cname + '/' + (idx + 1) + fileExt,
+                url: pVars.manga.filePath + file + '?cid=' + mangaData.cid + '&md5=' + mangaData.sl.md5
+            });
+        })
+
+
+        const bar = new ProgressBar(title + '    [:current/:total] :percent :etas', { total: imgInfos.length });
+
+        await batchSaveImage(imgInfos, url, 10, bar)
+
         this._setPageDownloaded(url)
     }
 }
 
-function writeFile(buffer, title) {
-    const [, folder, subfolder, page] = /关灯([^\/]+)\/([^\/]+)\/\((\d+)\/\d+\)/.exec(title)
-    const folderName = 'out/' + folder + '/' + subfolder
-    const fileName = folderName + '/' + page + '.webp'
-    fs.mkdirSync(folderName, {
-        recursive: true
+async function batchSaveImage(infos, referer, batchSize, bar) {
+    const promises = []
+    for (let info of infos) {
+        promises.push(getImageBufferPromise(info, referer))
+        if (promises.length % batchSize === 0) {
+            await Promise.all(promises)
+        }
+        bar.tick()
+    }
+    await Promise.all(promises)
+}
+
+function getImageBufferPromise(info, referer) {
+    return axios.get(info.url, {
+        headers: {
+            'Referer': referer,
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36'
+        },
+        responseType: 'arraybuffer'
     })
-    fs.writeFileSync(fileName, buffer, 'binary')
+    .then((response) => response.data)
+    .then(buffer => writeImage(buffer, info.filename))
 }
 
-function isLastPage(title) {
-    const [, page, totalPage] = /\((\d+)\/(\d+)\)/.exec(title)
-    return page === totalPage
-}
+async function writeImage(buffer, filename) {
+    const prefix = 'out/'
+    const foldername = /(.+\/)[^\/]+$/.exec(filename)[1]
 
-function isImage(request) {
-    const url = request.url()
-    return /webp/.test(url) && /cid/.test(url)
+    if (!fs.existsSync(prefix + foldername)) {
+        await mkdir(prefix + foldername, {
+            recursive: true
+        })
+    }
+
+    await writeFile(prefix + filename, buffer, 'binary')
 }
 
 module.exports = ManHuaGui
