@@ -1,12 +1,7 @@
 const fs = require('fs')
-const axios = require('axios')
-const util = require('util')
-
-var ProgressBar = require('progress');
-
-
-const mkdir = util.promisify(fs.mkdir)
-const writeFile = util.promisify(fs.writeFile)
+const PromisePool = require('es6-promise-pool')
+const ProgressBar = require('progress');
+const AxiosImageDownloader = require('./axios-image-downloader')
 
 class ManHuaGui {
     constructor(page) {
@@ -58,7 +53,6 @@ class ManHuaGui {
             return
         }
         await this.page.goto(url)
-        const title = /关灯(.+)\(.+\)/.exec(await this.page.$eval('div.title', node => node.textContent))[1]
         const mangaData = await this.page.evaluate(() => {
             SMH.imgData = function(n) { window.mangaData = n }
             let script = [...document.querySelectorAll('script:not([src])')].filter(s => /window.+fromCharCode/.test(s.innerHTML))[0]
@@ -73,55 +67,39 @@ class ManHuaGui {
             file = file.replace(/(.*)\.webp$/gi, "$1")
             const fileExt = (/(\.[^\.]+)$/.exec(file))[1]
             return ({
-                filename: mangaData.bname + '/' + mangaData.cname + '/' + (idx + 1) + fileExt,
+                filename: 'out/' + mangaData.bname + '/' + mangaData.cname + '/' + (idx + 1) + fileExt,
                 url: pVars.manga.filePath + file + '?cid=' + mangaData.cid + '&md5=' + mangaData.sl.md5
             });
         })
 
-
+        const title = /关灯(.+)\(.+\)/.exec(await this.page.$eval('div.title', node => node.textContent))[1]
         const bar = new ProgressBar(title + '    [:current/:total] :percent :etas', { total: imgInfos.length });
 
-        await batchSaveImage(imgInfos, url, 10, bar)
+        const pool = new PromisePool(createProducer(imgInfos, url, bar), 10)
+
+        await pool.start()
 
         this._setPageDownloaded(url)
     }
 }
 
-async function batchSaveImage(infos, referer, batchSize, bar) {
-    const promises = []
-    for (let info of infos) {
-        promises.push(getImageBufferPromise(info, referer))
-        if (promises.length % batchSize === 0) {
-            await Promise.all(promises)
-        }
+function createProducer(infos, referer, bar) {
+    const downloader = new AxiosImageDownloader()
+    const download = async (url, path, headers) => {
+        await downloader.download(url, path, headers)
         bar.tick()
     }
-    await Promise.all(promises)
-}
 
-function getImageBufferPromise(info, referer) {
-    return axios.get(info.url, {
-        headers: {
-            'Referer': referer,
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36'
-        },
-        responseType: 'arraybuffer'
-    })
-    .then((response) => response.data)
-    .then(buffer => writeImage(buffer, info.filename))
-}
-
-async function writeImage(buffer, filename) {
-    const prefix = 'out/'
-    const foldername = /(.+\/)[^\/]+$/.exec(filename)[1]
-
-    if (!fs.existsSync(prefix + foldername)) {
-        await mkdir(prefix + foldername, {
-            recursive: true
-        })
+    const headers = {
+        'Referer': referer,
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36'
     }
 
-    await writeFile(prefix + filename, buffer, 'binary')
+    return function* () {
+        for (let info of infos) {
+            yield download(info.url, info.filename, headers)
+        }
+    }
 }
 
 module.exports = ManHuaGui
