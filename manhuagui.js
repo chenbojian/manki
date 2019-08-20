@@ -58,7 +58,7 @@ const openMangaPage = async (url) => {
 const getMangaChapterUrls = async (url) => {
     const [page, close] = await openMangaPage(url)
     const urls = await page.$$eval('div.chapter-list li a', nodes => nodes.map(a => a.href))
-    close()
+    await close()
     return urls
 }
 
@@ -86,7 +86,7 @@ const getMangaChapterInfo = async (url) => {
 
     const title = /关灯(.+)\(.+\)/.exec(await page.$eval('div.title', node => node.textContent))[1]
 
-    close()
+    await close()
 
     return {
         title,
