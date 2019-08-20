@@ -63,7 +63,7 @@ const withPage = (urls) => async (func) => {
 const withMangaPage = (url) => withPage(['https://www.manhuagui.com/', url])
 
 const getMangaChapterUrls = async (url) => {
-    return withMangaPage(url)(
+    return await withMangaPage(url)(
         async (page) => {
             const urls = await page.$$eval('div.chapter-list li a', nodes => nodes.map(a => a.href))
             return urls
@@ -71,7 +71,7 @@ const getMangaChapterUrls = async (url) => {
 }
 
 const getMangaChapterInfo = async (url) => {
-    return withMangaPage(url)(
+    return await withMangaPage(url)(
         async (page) => {
             await page.goto(url)
             const mangaData = await page.evaluate(() => {
