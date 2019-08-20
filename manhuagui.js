@@ -41,57 +41,65 @@ const storage = (() => {
     return new ResumeStorage()
 })()
 
-const openMangaPage = async (url) => {
+const withPage = (urls) => async (func) => {
     const browser = await puppeteer.launch()
-    const page = await browser.newPage()
-    page.setViewport({
-        width: 1280,
-        height: 800,
-        deviceScaleFactor: 1,
-    })
-    await page.goto('https://www.manhuagui.com/')
-    await page.goto(url)
-    return [page, () => browser.close()]
+    try {
+        const page = await browser.newPage()
+        page.setViewport({
+            width: 1280,
+            height: 800,
+            deviceScaleFactor: 1,
+        })
+        for (let url of urls) {
+            await page.goto(url)
+        }
+        return await func(page)
+    } finally {
+        await browser.close()
+    }
+
 }
 
+const withMangaPage = (url) => withPage(['https://www.manhuagui.com/', url])
 
 const getMangaChapterUrls = async (url) => {
-    const [page, close] = await openMangaPage(url)
-    const urls = await page.$$eval('div.chapter-list li a', nodes => nodes.map(a => a.href))
-    await close()
-    return urls
+    return withMangaPage(url)(
+        async (page) => {
+            const urls = await page.$$eval('div.chapter-list li a', nodes => nodes.map(a => a.href))
+            return urls
+        })
 }
 
 const getMangaChapterInfo = async (url) => {
-    const [page, close] = await openMangaPage(url)
-    await page.goto(url)
-    const mangaData = await page.evaluate(() => {
-        SMH.imgData = function(n) { window.mangaData = n }
-        let script = [...document.querySelectorAll('script:not([src])')].filter(s => /window.+fromCharCode/.test(s.innerHTML))[0]
-        let newScript = document.createElement('script')
-        newScript.type = "text\/javascript"
-        newScript.innerHTML = script.innerHTML
-        document.body.append(newScript)          
-        return window.mangaData
-    })
-    const pVars = await page.evaluate(() => pVars)
-    const imgInfos = mangaData.files.map((file, idx) => {
-        file = file.replace(/(.*)\.webp$/gi, "$1")
-        const fileExt = (/(\.[^\.]+)$/.exec(file))[1]
-        return ({
-            filename: 'out/' + mangaData.bname + '/' + mangaData.cname + '/' + stringify(idx + 1, 10) + fileExt,
-            url: pVars.manga.filePath + file + '?cid=' + mangaData.cid + '&md5=' + mangaData.sl.md5
-        });
-    })
+    return withMangaPage(url)(
+        async (page) => {
+            await page.goto(url)
+            const mangaData = await page.evaluate(() => {
+                SMH.imgData = function (n) { window.mangaData = n }
+                let script = [...document.querySelectorAll('script:not([src])')].filter(s => /window.+fromCharCode/.test(s.innerHTML))[0]
+                let newScript = document.createElement('script')
+                newScript.type = "text\/javascript"
+                newScript.innerHTML = script.innerHTML
+                document.body.append(newScript)
+                return window.mangaData
+            })
+            const pVars = await page.evaluate(() => pVars)
+            const imgInfos = mangaData.files.map((file, idx) => {
+                file = file.replace(/(.*)\.webp$/gi, "$1")
+                const fileExt = (/(\.[^\.]+)$/.exec(file))[1]
+                return ({
+                    filename: 'out/' + mangaData.bname + '/' + mangaData.cname + '/' + stringify(idx + 1, 10) + fileExt,
+                    url: pVars.manga.filePath + file + '?cid=' + mangaData.cid + '&md5=' + mangaData.sl.md5
+                });
+            })
 
-    const title = /关灯(.+)\(.+\)/.exec(await page.$eval('div.title', node => node.textContent))[1]
+            const title = /关灯(.+)\(.+\)/.exec(await page.$eval('div.title', node => node.textContent))[1]
 
-    await close()
-
-    return {
-        title,
-        infos: imgInfos
-    }
+            return {
+                title,
+                infos: imgInfos
+            }
+        })
 }
 
 const download = async (url) => {
