@@ -2,85 +2,129 @@ const fs = require('fs')
 const PromisePool = require('es6-promise-pool')
 const ProgressBar = require('progress');
 const AxiosImageDownloader = require('./axios-image-downloader')
+const puppeteer = require('puppeteer')
 
-class ManHuaGui {
-    constructor(page) {
-        this.page = page
-        this.imageBufferPromises = {}
-        this.db = this._loadDb()
-    }
 
-    _loadDb() {
-        if (fs.existsSync('db.json')) {
-            return JSON.parse(fs.readFileSync('db.json', 'utf8'))
+const storage = (() => {
+    class ResumeStorage {
+        constructor() {
+            this.db = this._loadDb()
         }
-        return {};
-    }
-
-    _persistDb() {
-        fs.writeFileSync('db.json', JSON.stringify(this.db), 'utf8')
-    }
-
-    _isPageDownloaded(url) {
-        if (!this.db.downloadedPages) {
-            return false
+    
+        _loadDb() {
+            if (fs.existsSync('db.json')) {
+                return JSON.parse(fs.readFileSync('db.json', 'utf8'))
+            }
+            return {};
         }
-        return this.db.downloadedPages[url]
-    }
-
-    _setPageDownloaded(url) {
-        if (!this.db.downloadedPages) {
-            this.db.downloadedPages = {}
+    
+        _persistDb() {
+            fs.writeFileSync('db.json', JSON.stringify(this.db), 'utf8')
         }
-        this.db.downloadedPages[url] = true
-        this._persistDb()
-    }
-
-    async init() {
-        await this.page.goto('https://www.manhuagui.com/')
-    }
-
-    async downloadAll(url) {
-        await this.page.goto(url)
-        const list = await this.page.$$eval('div.chapter-list li a', nodes => nodes.map(a => a.href))
-        for (const i of list) {
-            await this.download(i)
+    
+        markAsDownloaded(pageUrl) {
+            if (!this.db.downloadedPages) {
+                this.db.downloadedPages = {}
+            }
+            this.db.downloadedPages[url] = true
+            this._persistDb()
+        }
+    
+        isDownloaded(pageUrl) {
+            if (!this.db.downloadedPages) {
+                return false
+            }
+            return this.db.downloadedPages[url]
         }
     }
+    return new ResumeStorage()
+})()
 
-    async download(url) {
-        if (this._isPageDownloaded(url)) {
-            return
+const openMangaPage = async (url) => {
+    const browser = await puppeteer.launch()
+    const page = await browser.newPage()
+    page.setViewport({
+        width: 1280,
+        height: 800,
+        deviceScaleFactor: 1,
+    })
+    await page.goto('https://www.manhuagui.com/')
+    await page.goto(url)
+    return [page, () => browser.close()]
+}
+
+
+const getMangaChapterUrls = async (url) => {
+    const [page, close] = await openMangaPage(url)
+    const urls = await page.$$eval('div.chapter-list li a', nodes => nodes.map(a => a.href))
+    close()
+    return urls
+}
+
+const getMangaChapterInfo = async (url) => {
+    await page.goto(url)
+    const mangaData = await page.evaluate(() => {
+        SMH.imgData = function(n) { window.mangaData = n }
+        let script = [...document.querySelectorAll('script:not([src])')].filter(s => /window.+fromCharCode/.test(s.innerHTML))[0]
+        let newScript = document.createElement('script')
+        newScript.type = "text\/javascript"
+        newScript.innerHTML = script.innerHTML
+        document.body.append(newScript)          
+        return window.mangaData
+    })
+    const pVars = await page.evaluate(() => pVars)
+    const imgInfos = mangaData.files.map((file, idx) => {
+        file = file.replace(/(.*)\.webp$/gi, "$1")
+        const fileExt = (/(\.[^\.]+)$/.exec(file))[1]
+        return ({
+            filename: 'out/' + mangaData.bname + '/' + mangaData.cname + '/' + stringify(idx + 1, 10) + fileExt,
+            url: pVars.manga.filePath + file + '?cid=' + mangaData.cid + '&md5=' + mangaData.sl.md5
+        });
+    })
+
+    const title = /关灯(.+)\(.+\)/.exec(await page.$eval('div.title', node => node.textContent))[1]
+
+
+    return {
+        title,
+        infos: imgInfos
+    }
+}
+
+const download = async (url) => {
+    const chapterUrls = await retry(getMangaChapterUrls, 2)(url)
+    for (let chapterUrl of chapterUrls) {
+        if (storage.isDownloaded(chapterUrl)) {
+            continue
         }
-        await this.page.goto(url)
-        const mangaData = await this.page.evaluate(() => {
-            SMH.imgData = function(n) { window.mangaData = n }
-            let script = [...document.querySelectorAll('script:not([src])')].filter(s => /window.+fromCharCode/.test(s.innerHTML))[0]
-            let newScript = document.createElement('script')
-            newScript.type = "text\/javascript"
-            newScript.innerHTML = script.innerHTML
-            document.body.append(newScript)          
-            return window.mangaData
-        })
-        const pVars = await this.page.evaluate(() => pVars)
-        const imgInfos = mangaData.files.map((file, idx) => {
-            file = file.replace(/(.*)\.webp$/gi, "$1")
-            const fileExt = (/(\.[^\.]+)$/.exec(file))[1]
-            return ({
-                filename: 'out/' + mangaData.bname + '/' + mangaData.cname + '/' + stringify(idx + 1, 10) + fileExt,
-                url: pVars.manga.filePath + file + '?cid=' + mangaData.cid + '&md5=' + mangaData.sl.md5
-            });
-        })
+        const chapterInfo = await retry(getMangaChapterInfo, 2)(chapterUrl)
 
-        const title = /关灯(.+)\(.+\)/.exec(await this.page.$eval('div.title', node => node.textContent))[1]
-        const bar = new ProgressBar(title + '    [:current/:total] :percent :etas', { total: imgInfos.length });
+        const bar = new ProgressBar(chapterInfo.title + '    [:current/:total] :percent :etas', { total: chapterInfo.infos.length });
 
-        const pool = new PromisePool(createProducer(imgInfos, url, bar), 10)
+        const pool = new PromisePool(createProducer(chapterInfo.infos, chapterUrl, bar), 10)
 
         await pool.start()
 
-        this._setPageDownloaded(url)
+        storage.markAsDownloaded(chapterUrl)
     }
+}
+
+function retry(funcAsync, times) {
+    const count = 1
+
+    async function innerRetry(...args) {
+        try {
+            return await funcAsync(...args)
+        } catch (e) {
+            console.error(`${funcAsync.name}...failed ${count} times with ${args}`)
+        }
+        if (count < times) {
+            count = count + 1
+            return await innerRetry(...args)
+        }
+    }
+
+    return innerRetry
 }
 
 function stringify(num, digits) {
@@ -107,4 +151,6 @@ function createProducer(infos, referer, bar) {
     }
 }
 
-module.exports = ManHuaGui
+module.exports = {
+    download
+}
