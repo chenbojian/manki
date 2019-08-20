@@ -54,6 +54,8 @@ const withPage = (urls) => async (func) => {
             await page.goto(url)
         }
         return await func(page)
+    } catch(e) {
+        throw e
     } finally {
         await browser.close()
     }
