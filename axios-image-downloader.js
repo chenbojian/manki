@@ -1,6 +1,7 @@
 const axios = require('axios')
 const util = require('util')
 const fs = require('fs')
+const retry = require('./retry')
 const mkdir = util.promisify(fs.mkdir)
 const writeFile = util.promisify(fs.writeFile)
 
@@ -11,6 +12,7 @@ class AxiosImageDownloader {
             headers: headers,
             responseType: 'arraybuffer'
         })
+
         const buffer = await response.data
         await writeImage(buffer, path)
     }

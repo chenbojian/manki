@@ -1,9 +1,10 @@
 const fs = require('fs')
 const PromisePool = require('es6-promise-pool')
 const ProgressBar = require('progress');
-const AxiosImageDownloader = require('./axios-image-downloader')
+// const AxiosImageDownloader = require('./axios-image-downloader')
+const CurlImageDownloader = require('./curl-image-downloader')
 const puppeteer = require('puppeteer')
-
+const retry = require('./retry')
 
 const storage = (() => {
     class ResumeStorage {
@@ -111,31 +112,13 @@ const download = async (url) => {
     }
 }
 
-function retry(funcAsync, times) {
-    let count = 1
-
-    async function innerRetry(...args) {
-        try {
-            return await funcAsync(...args)
-        } catch (e) {
-            console.error(`${funcAsync.name}...failed ${count} times with ${args}`, e)
-        }
-        if (count < times) {
-            count = count + 1
-            return await innerRetry(...args)
-        }
-    }
-
-    return innerRetry
-}
-
 function stringify(num, digits) {
     let str = num.toString()
     return Array(digits - str.length).fill('0').join('') + str
 }
 
 function createProducer(infos, referer, bar) {
-    const downloader = new AxiosImageDownloader()
+    const downloader = new CurlImageDownloader()
     const download = async (url, path, headers) => {
         await downloader.download(url, path, headers)
         bar.tick()
