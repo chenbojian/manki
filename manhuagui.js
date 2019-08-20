@@ -26,7 +26,7 @@ const storage = (() => {
             if (!this.db.downloadedPages) {
                 this.db.downloadedPages = {}
             }
-            this.db.downloadedPages[url] = true
+            this.db.downloadedPages[pageUrl] = true
             this._persistDb()
         }
     
@@ -34,7 +34,7 @@ const storage = (() => {
             if (!this.db.downloadedPages) {
                 return false
             }
-            return this.db.downloadedPages[url]
+            return this.db.downloadedPages[pageUrl]
         }
     }
     return new ResumeStorage()
@@ -62,6 +62,7 @@ const getMangaChapterUrls = async (url) => {
 }
 
 const getMangaChapterInfo = async (url) => {
+    const [page, close] = await openMangaPage(url)
     await page.goto(url)
     const mangaData = await page.evaluate(() => {
         SMH.imgData = function(n) { window.mangaData = n }
@@ -84,6 +85,7 @@ const getMangaChapterInfo = async (url) => {
 
     const title = /关灯(.+)\(.+\)/.exec(await page.$eval('div.title', node => node.textContent))[1]
 
+    close()
 
     return {
         title,
@@ -110,13 +112,13 @@ const download = async (url) => {
 }
 
 function retry(funcAsync, times) {
-    const count = 1
+    let count = 1
 
     async function innerRetry(...args) {
         try {
             return await funcAsync(...args)
         } catch (e) {
-            console.error(`${funcAsync.name}...failed ${count} times with ${args}`)
+            console.error(`${funcAsync.name}...failed ${count} times with ${args}`, e)
         }
         if (count < times) {
             count = count + 1
