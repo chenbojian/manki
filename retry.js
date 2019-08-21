@@ -5,10 +5,11 @@ function retry(funcAsync, times) {
         try {
             return await funcAsync(...args)
         } catch (e) {
-        }
-        if (count < times) {
-            count = count + 1
-            return await innerRetry(...args)
+            if (count < times) {
+                count = count + 1
+                return await innerRetry(...args)
+            }
+            throw e
         }
     }
 

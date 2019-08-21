@@ -1,7 +1,6 @@
 const fs = require('fs')
 const PromisePool = require('es6-promise-pool')
 const ProgressBar = require('progress');
-// const AxiosImageDownloader = require('./axios-image-downloader')
 const CurlImageDownloader = require('./curl-image-downloader')
 const puppeteer = require('puppeteer')
 const retry = require('./retry')
@@ -59,17 +58,16 @@ const withPage = (urls) => async (func) => {
     } finally {
         await browser.close()
     }
-
 }
 
 const withMangaPage = (url) => withPage(['https://www.manhuagui.com/', url])
 
 const getMangaChapterUrls = async (url) => {
-    return await withMangaPage(url)(
+    return await (withMangaPage(url)(
         async (page) => {
             const urls = await page.$$eval('div.chapter-list li a', nodes => nodes.map(a => a.href))
             return urls
-        })
+        }))
 }
 
 const getMangaChapterInfo = async (url) => {
@@ -105,12 +103,12 @@ const getMangaChapterInfo = async (url) => {
 }
 
 const download = async (url) => {
-    const chapterUrls = await retry(getMangaChapterUrls, 2)(url)
+    const chapterUrls = await retry(getMangaChapterUrls, 3)(url)
     for (let chapterUrl of chapterUrls) {
         if (storage.isDownloaded(chapterUrl)) {
             continue
         }
-        const chapterInfo = await retry(getMangaChapterInfo, 2)(chapterUrl)
+        const chapterInfo = await retry(getMangaChapterInfo, 3)(chapterUrl)
 
         const bar = new ProgressBar(chapterInfo.title + '    [:current/:total] :percent :etas', { total: chapterInfo.infos.length });
 
@@ -128,9 +126,9 @@ function stringify(num, digits) {
 }
 
 function createProducer(infos, referer, bar) {
-    const downloader = new CurlImageDownloader()
-    const download = async (url, path, headers) => {
-        await downloader.download(url, path, headers)
+    const imageDownloader = new CurlImageDownloader()
+    const downloadImage = async (url, path, headers) => {
+        await imageDownloader.download(url, path, headers)
         bar.tick()
     }
 
@@ -141,7 +139,7 @@ function createProducer(infos, referer, bar) {
 
     return function* () {
         for (let info of infos) {
-            yield download(info.url, info.filename, headers)
+            yield retry(downloadImage, 3)(info.url, info.filename, headers)
         }
     }
 }
