@@ -1,4 +1,5 @@
 out/
+data/
 db.json
 .vscode
 node_modules/
