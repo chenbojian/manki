@@ -1,6 +1,7 @@
 const archiver = require('archiver')
 const fs = require('fs')
 const path = require('path')
+const rimraf = require('rimraf')
 
 function zipDirectory(source, out) {
   const archive = archiver('zip', { zlib: { level: 9 }})
@@ -29,11 +30,7 @@ async function main() {
     }
 
     for (p of subpaths) {
-        try {
-            fs.rmdirSync(path.join(mangaBookPath, p))
-        } catch (e) {
-            fs.unlinkSync(path.join(mangaBookPath, p))
-        }
+        rimraf.sync(path.join(mangaBookPath, p))
     }
 }
 
