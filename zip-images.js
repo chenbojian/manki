@@ -29,7 +29,11 @@ async function main() {
     }
 
     for (p of subpaths) {
-        fs.rmdirSync(path.join(chapterPath, p))
+        try {
+            fs.rmdirSync(path.join(mangaBookPath, p))
+        } catch (e) {
+            fs.unlinkSync(path.join(mangaBookPath, p))
+        }
     }
 }
 
