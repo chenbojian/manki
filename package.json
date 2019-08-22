@@ -8,6 +8,7 @@
     "start": "node transform-books-to-chapters.js && node transform-chapters-to-images && node download-images.js"
   },
   "dependencies": {
+    "archiver": "^3.1.1",
     "axios": "^0.19.0",
     "es6-promise-pool": "^2.5.0",
     "progress": "^2.0.3",
