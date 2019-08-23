@@ -1,4 +1,3 @@
-const fs = require('fs')
 const { loadJsonFile, saveJsonFile } = require('./utils')
 const { withMangaPage } = require('./page')
 const ProgressBar = require('progress')

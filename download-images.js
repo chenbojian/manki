@@ -1,4 +1,3 @@
-const fs = require('fs')
 const path = require('path')
 const { loadJsonFile, saveJsonFile } = require('./utils')
 const PromisePool = require('es6-promise-pool')
