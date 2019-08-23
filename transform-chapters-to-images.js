@@ -9,7 +9,6 @@ const imagesFilename = 'data/images.json'
 const getMangaImageInfos = async (url) => {
     return await withMangaPage(url)(
         async (page) => {
-            await page.goto(url)
             const mangaData = await page.evaluate(() => {
                 SMH.imgData = function (n) { window.mangaData = n }
                 let script = [...document.querySelectorAll('script:not([src])')].filter(s => /window.+fromCharCode/.test(s.innerHTML))[0]

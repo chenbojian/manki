@@ -9,9 +9,8 @@ const withMangaPage = (url) => async (func) => {
             height: 800,
             deviceScaleFactor: 1,
         })
-        await page.goto(url, {
-            referer: 'https://www.manhuagui.com/'
-        })
+        await page.goto('https://www.manhuagui.com/')
+        await page.goto(url)
         return await func(page)
     } catch(e) {
         throw e
