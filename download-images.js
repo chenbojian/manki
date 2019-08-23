@@ -1,38 +1,36 @@
 const path = require('path')
-const { loadJsonFile, saveJsonFile } = require('./utils')
 const PromisePool = require('es6-promise-pool')
 const ProgressBar = require('progress')
 const CurlImageDownloader = require('./curl-image-downloader')
 const retry = require('./retry')
+const PouchDB = require('pouchdb')
 
-const imagesFilename = 'data/images.json'
-const downloadedImagesFilename = 'data/downloaded-images.json'
+const imageDB = new PouchDB('data/images')
 
-const saveDownloaedImages = (downloadedImages) => {
-    const oldDownloadedImages = loadJsonFile(downloadedImagesFilename, [])
-    saveJsonFile(downloadedImagesFilename, [...oldDownloadedImages, ...downloadedImages])
-}
+const loadImages = async () => {
+    const images = (await imageDB.allDocs({
+        include_docs: true
+    })).rows.map(r => r.doc)
 
-const loadImages = () => {
-    const images = loadJsonFile(imagesFilename, [])
-    const downloadedImages = loadJsonFile(downloadedImagesFilename, [])
-    const downloadedImageUrls = new Set(downloadedImages.map(i => i.url))
-    return images.filter(i => !downloadedImageUrls.has(i.url))
+    return images.filter(i => !i.downloaded)
 }
 
 const main = async () => {
-    const images = loadImages()
+    const images = await loadImages()
     const bar = new ProgressBar('download [:current/:total] :percent :etas', { total: images.length });
     const imageDownloader = new CurlImageDownloader()
-    const download = async (url, path, headers) => {
+    const download = async (image) => {
         try {
-            await imageDownloader.download(url, path, headers)
+            const headers = {
+                'Referer': image.chapterUrl,
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36'
+            }
+            await imageDownloader.download(image.url, path.join(image.path, image.filename), headers)
             bar.tick()
-            saveDownloaedImages([{
-                url,
-                path,
-                headers
-            }])
+            await imageDB.put({
+                ...image,
+                downloaded: true,
+            })
         } catch (e) {
             console.error(`\n Error on downloading ${e}\n`)
         }
@@ -41,11 +39,7 @@ const main = async () => {
     
     const producer = function* () {
         for (let image of images) {
-            const headers = {
-                'Referer': image.chapterUrl,
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36'
-            }
-            yield retry(download, 3)(image.url, path.join(image.path, image.filename) , headers)
+            yield retry(download, 3)(image)
         }
     }
     const pool = new PromisePool(producer, 10)
@@ -54,3 +48,9 @@ const main = async () => {
 }
 
 main()
+    .catch(e => {
+        console.error(e)
+    })
+    .finally(() => {
+        imageDB.close()
+    })

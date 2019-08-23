@@ -1,9 +1,10 @@
-const { loadJsonFile, saveJsonFile } = require('./utils')
+const { loadJsonFile } = require('./utils')
 const { withMangaPage } = require('./page')
 const ProgressBar = require('progress')
+const PouchDB = require('pouchdb')
 
 const bookUrlsFilename = 'data/book-urls.json'
-const chaptersFilename = 'data/chapters.json'
+const chapterDB = new PouchDB('data/chapters')
 
 const getMangaChapterUrls = async (url) => {
     return await (withMangaPage(url)(
@@ -13,26 +14,24 @@ const getMangaChapterUrls = async (url) => {
         }))
 }
 
-const saveChapters = (chapters) => {
-    const oldChapters = loadJsonFile(chaptersFilename, [])
-    saveJsonFile(chaptersFilename, [...oldChapters, ...chapters])
-}
-
-const loadBookUrls = () => {
+const loadBookUrls = async () => {
     const bookUrls = loadJsonFile(bookUrlsFilename, [])
-    const chapters = loadJsonFile(chaptersFilename, [])
+    const chapters = (await chapterDB.allDocs({
+        include_docs: true
+    })).rows.map(r => r.doc)
     const transformedBookUrls = new Set(chapters.map(c => c.bookUrl))
     return bookUrls.filter(url => !transformedBookUrls.has(url))
 }
 
 const main = async () => {
-    const bookUrls = loadBookUrls()
+    const bookUrls = await loadBookUrls()
     const bar = new ProgressBar('transform books to chapters [:current/:total] :percent :etas', { total: bookUrls.length });
 
     for (let bookUrl of bookUrls) {
         const chapterUrls = await getMangaChapterUrls(bookUrl)
 
-        saveChapters(chapterUrls.map(c => ({
+        await chapterDB.bulkDocs(chapterUrls.map(c => ({
+            _id: c,
             url: c,
             bookUrl,
         })))
@@ -42,3 +41,9 @@ const main = async () => {
 }
 
 main()
+    .catch(e => {
+        console.error(e)
+    })
+    .finally(() => {
+        chapterDB.close()
+    })

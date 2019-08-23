@@ -1,9 +1,9 @@
-const { loadJsonFile, saveJsonFile } = require('./utils')
 const { withMangaPage } = require('./page')
 const ProgressBar = require('progress')
+const PouchDB = require('pouchdb')
 
-const chaptersFilename = 'data/chapters.json'
-const imagesFilename = 'data/images.json'
+const chapterDB = new PouchDB('data/chapters')
+const imageDB = new PouchDB('data/images')
 
 const getMangaImageInfos = async (url) => {
     return await withMangaPage(url)(
@@ -36,26 +36,28 @@ function stringify(num, digits) {
     return Array(digits - str.length).fill('0').join('') + str
 }
 
+const loadChapters = async () => {
+    const chapters = (await chapterDB.allDocs({
+        include_docs: true
+    })).rows.map(r => r.doc)
 
-const saveImages = (images) => {
-    const oldImages = loadJsonFile(imagesFilename, [])
-    saveJsonFile(imagesFilename, [...oldImages, ...images])
-}
+    const images = (await imageDB.allDocs({
+        include_docs: true
+    })).rows.map(r => r.doc)
 
-const loadChapters = () => {
-    const chapters = loadJsonFile(chaptersFilename, [])
-    const images = loadJsonFile(imagesFilename, [])
     const transformedChapterUrls = new Set(images.map(i => i.chapterUrl))
     return chapters.filter(c => !transformedChapterUrls.has(c.url))
 }
 
 const main = async () => {
-    const chapters = loadChapters()
+    const chapters = await loadChapters()
     const bar = new ProgressBar('transform chapters to images [:current/:total] :percent :etas', { total: chapters.length });
 
     for (let chapter of chapters) {
         const imageInfos = await getMangaImageInfos(chapter.url)
-        saveImages(imageInfos.map(i => ({
+
+        imageDB.bulkDocs(imageInfos.map(i => ({
+            _id: i.url,
             url: i.url,
             filename: i.filename,
             path: 'out/',
@@ -67,3 +69,10 @@ const main = async () => {
 }
 
 main()
+    .catch(e => {
+        console.error(e)
+    })
+    .finally(() => {
+        chapterDB.close()
+        imageDB.close()
+    })
