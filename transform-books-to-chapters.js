@@ -9,6 +9,10 @@ const chapterDB = new PouchDB('data/chapters')
 const getMangaChapterUrls = async (url) => {
     return await (withMangaPage(url)(
         async (page) => {
+            const adultCheck = await page.$('a#checkAdult')
+            if (adultCheck) {
+                await adultCheck.click()
+            }
             const urls = await page.$$eval('div.chapter-list li a', nodes => nodes.map(a => a.href))
             return urls
         }))

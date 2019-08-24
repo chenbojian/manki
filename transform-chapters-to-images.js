@@ -56,7 +56,7 @@ const main = async () => {
     for (let chapter of chapters) {
         const imageInfos = await getMangaImageInfos(chapter.url)
 
-        imageDB.bulkDocs(imageInfos.map(i => ({
+        await imageDB.bulkDocs(imageInfos.map(i => ({
             _id: i.url,
             url: i.url,
             filename: i.filename,
