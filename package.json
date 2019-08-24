@@ -5,7 +5,7 @@
   "author": "chenbojian <chenbojian@foxmail.com>",
   "license": "MIT",
   "scripts": {
-    "start": "node transform-books-to-chapters.js && node transform-chapters-to-images && node download-images.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "archiver": "^3.1.1",

@@ -15,7 +15,7 @@ const loadImages = async () => {
     return images.filter(i => !i.downloaded)
 }
 
-const main = async () => {
+const run = async () => {
     const images = await loadImages()
     const bar = new ProgressBar('download [:current/:total] :percent :etas', { total: images.length });
     const imageDownloader = new CurlImageDownloader()
@@ -47,10 +47,12 @@ const main = async () => {
     await pool.start()
 }
 
-main()
-    .catch(e => {
+module.exports = async () => {
+    try {
+        await run()
+    } catch(e) {
         console.error(e)
-    })
-    .finally(() => {
-        imageDB.close()
-    })
+    } finally {
+        await imageDB.close()
+    }
+}

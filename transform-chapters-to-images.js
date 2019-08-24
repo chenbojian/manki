@@ -49,7 +49,7 @@ const loadChapters = async () => {
     return chapters.filter(c => !transformedChapterUrls.has(c.url))
 }
 
-const main = async () => {
+const run = async () => {
     const chapters = await loadChapters()
     const bar = new ProgressBar('transform chapters to images [:current/:total] :percent :etas', { total: chapters.length });
 
@@ -68,11 +68,13 @@ const main = async () => {
     }
 }
 
-main()
-    .catch(e => {
+module.exports = async () => {
+    try {
+        await run()
+    } catch(e) {
         console.error(e)
-    })
-    .finally(() => {
-        chapterDB.close()
-        imageDB.close()
-    })
+    } finally {
+        await chapterDB.close()
+        await imageDB.close()
+    }
+}

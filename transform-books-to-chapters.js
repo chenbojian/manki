@@ -27,7 +27,7 @@ const loadBookUrls = async () => {
     return bookUrls.filter(url => !transformedBookUrls.has(url))
 }
 
-const main = async () => {
+const run = async () => {
     const bookUrls = await loadBookUrls()
     const bar = new ProgressBar('transform books to chapters [:current/:total] :percent :etas', { total: bookUrls.length });
 
@@ -44,10 +44,13 @@ const main = async () => {
     }
 }
 
-main()
-    .catch(e => {
+module.exports = async () => {
+    try {
+        await run()
+    } catch(e) {
         console.error(e)
-    })
-    .finally(() => {
-        chapterDB.close()
-    })
+    } finally {
+        await chapterDB.close()
+    }
+
+}
