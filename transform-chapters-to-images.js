@@ -1,6 +1,7 @@
 const { withMangaPage } = require('./page')
 const ProgressBar = require('progress')
 const PouchDB = require('pouchdb')
+const retry = require('./retry')
 
 const chapterDB = new PouchDB('data/chapters')
 const imageDB = new PouchDB('data/images')
@@ -54,7 +55,7 @@ const run = async () => {
     const bar = new ProgressBar('transform chapters to images [:current/:total] :percent :etas', { total: chapters.length });
 
     for (let chapter of chapters) {
-        const imageInfos = await getMangaImageInfos(chapter.url)
+        const imageInfos = await retry(getMangaImageInfos, 30)(chapter.url)
 
         await imageDB.bulkDocs(imageInfos.map(i => ({
             _id: i.url,

@@ -2,6 +2,7 @@ const { loadJsonFile } = require('./utils')
 const { withMangaPage } = require('./page')
 const ProgressBar = require('progress')
 const PouchDB = require('pouchdb')
+const retry = require('./retry')
 
 const bookUrlsFilename = 'data/book-urls.json'
 const chapterDB = new PouchDB('data/chapters')
@@ -32,7 +33,7 @@ const run = async () => {
     const bar = new ProgressBar('transform books to chapters [:current/:total] :percent :etas', { total: bookUrls.length });
 
     for (let bookUrl of bookUrls) {
-        const chapterUrls = await getMangaChapterUrls(bookUrl)
+        const chapterUrls = await retry(getMangaChapterUrls, 30)(bookUrl)
 
         await chapterDB.bulkDocs(chapterUrls.map(c => ({
             _id: c,
