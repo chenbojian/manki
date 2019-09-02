@@ -19,23 +19,24 @@ const getMangaChapterUrls = async (url) => {
         }))
 }
 
-const loadBookUrls = async () => {
-    const bookUrls = loadJsonFile(bookUrlsFilename, [])
-    const chapters = (await chapterDB.allDocs({
-        include_docs: true
-    })).rows.map(r => r.doc)
-    const transformedBookUrls = new Set(chapters.map(c => c.bookUrl))
-    return bookUrls.filter(url => !transformedBookUrls.has(url))
+const loadBookUrls = () => {
+    return loadJsonFile(bookUrlsFilename, [])
 }
 
 const run = async () => {
-    const bookUrls = await loadBookUrls()
+    const bookUrls = loadBookUrls()
     const bar = new ProgressBar('transform books to chapters [:current/:total] :percent :etas', { total: bookUrls.length });
+
+    const chapters = (await chapterDB.allDocs({
+        include_docs: true
+    })).rows.map(r => r.doc)
+    const chapterUrlSet = new Set(chapters.map(c => c.url))
 
     for (let bookUrl of bookUrls) {
         const chapterUrls = await retry(getMangaChapterUrls, 30)(bookUrl)
+        const newChapterUrls = chapterUrls.filter(c => !chapterUrlSet.has(c))
 
-        await chapterDB.bulkDocs(chapterUrls.map(c => ({
+        await chapterDB.bulkDocs(newChapterUrls.map(c => ({
             _id: c,
             url: c,
             bookUrl,

@@ -19,19 +19,24 @@ function zipDirectory(source, out) {
   })
 }
 
+async function zipBook(bookPath) {
+  const subpaths = fs.readdirSync(bookPath)
+
+  for (subpath of subpaths) {
+    const fullPath = path.join(bookPath, subpath)
+    if (/DS_Store/.test(fullPath)) {
+      rimraf.sync(fullPath)
+    } else if (fs.statSync(fullPath).isDirectory()) {
+      await zipDirectory(fullPath, fullPath + '.zip')
+      rimraf.sync(fullPath)
+      console.log('zipped ' + fullPath)
+    }
+  }
+}
+
 async function main() {
     const mangaBookPath = process.argv[2]
-
-    const subpaths = fs.readdirSync(mangaBookPath)
-    
-    for (subpath of subpaths.filter(p => !/DS_Store/.test(p))) {
-        const chapterPath = path.join(mangaBookPath, subpath)
-        await zipDirectory(chapterPath, chapterPath + '.zip')
-    }
-
-    for (p of subpaths) {
-        rimraf.sync(path.join(mangaBookPath, p))
-    }
+    await zipBook(mangaBookPath)
 }
 
 main()

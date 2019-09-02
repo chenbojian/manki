@@ -15,6 +15,7 @@ const withMangaPage = (url) => async (func) => {
         await page.goto(url)
         return await func(page)
     } catch(e) {
+        await page.screenshot({path: url + '.png'})
         throw e
     } finally {
         await browser.close()
