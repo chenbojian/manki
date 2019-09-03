@@ -14,10 +14,11 @@ const withMangaPage = (url) => async (func) => {
         await page.goto('https://www.manhuagui.com/', {
             waitUntil: 'domcontentloaded'
         })
-        await page.goto(url)
+        await page.goto(url, {
+            waitUntil: 'networkidle2'
+        })
         return await func(page)
     } catch(e) {
-        await page.screenshot({path: url + '.png'})
         throw e
     } finally {
         await browser.close()
