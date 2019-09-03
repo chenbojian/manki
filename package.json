@@ -5,7 +5,8 @@
   "author": "chenbojian <chenbojian@foxmail.com>",
   "license": "MIT",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "debug": "DEBUG=\"true\" node index.js"
   },
   "dependencies": {
     "archiver": "^3.1.1",

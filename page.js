@@ -1,7 +1,9 @@
 const puppeteer = require('puppeteer')
 
 const withMangaPage = (url) => async (func) => {
-    const browser = await puppeteer.launch()
+    const browser = await puppeteer.launch({
+        headless: process.env['DEBUG'] !== 'true'
+    })
     try {
         const page = await browser.newPage()
         page.setViewport({
