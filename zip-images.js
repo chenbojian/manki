@@ -20,9 +20,11 @@ function zipDirectory(source, out) {
   })
 }
 
+const imagesPromise = loadImages()
+
 async function isChapterDownloaded(fullPath) {
   const [, book, chapter] = fullPath.split(path.sep)
-  const images = await loadImages()
+  const images = await imagesPromise
   const infos = images.map(i => {
     const [iBook, iChapter, iFile] = i.filename.split(path.sep)
     return {
@@ -33,6 +35,7 @@ async function isChapterDownloaded(fullPath) {
     }
   })
   const chapterInfos = infos.filter(i => i.book === book & i.chapter === chapter)
+
   if (chapterInfos.length === 0) {
     return false
   }
