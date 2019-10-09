@@ -97,7 +97,7 @@ async function downloadChapter(chapterData) {
     }
 }
 
-getChapterUrls(process.argv[1])
+getChapterUrls(process.argv[2])
     .then(async (chapterUrls) => {
         for (let chapterUrl of chapterUrls) {
             await getChapterData(chapterUrl).then(downloadChapter)
