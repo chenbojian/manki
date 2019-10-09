@@ -5,8 +5,7 @@
   "author": "chenbojian <chenbojian@foxmail.com>",
   "license": "MIT",
   "scripts": {
-    "start": "node index.js",
-    "debug": "DEBUG=\"true\" node index.js"
+    "start": "node manhuagui-js/index.js"
   },
   "dependencies": {
     "archiver": "^3.1.1",
