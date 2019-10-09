@@ -67,14 +67,11 @@ async function downloadChapter(chapterData) {
     }
     const folderPath = path.join('out', chapterData.book, chapterData.chapter)
 
-    for (var images of _.chunk(chapterData.images, 10)) {
-        await Promise.all(
-            images.map(image =>
-                downloader.download(
-                    image.url,
-                    path.join(folderPath, image.name),
-                    headers))
-        )
+    for (let image of chapterData.images) {
+        downloader.download(
+            image.url,
+            path.join(folderPath, image.name),
+            headers)
     }
 
     await zipDirectory(folderPath, folderPath + '.zip')
