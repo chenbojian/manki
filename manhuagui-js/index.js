@@ -5,6 +5,7 @@ const archiver = require('archiver')
 const fs = require('fs')
 const rimraf = require('rimraf')
 const _ = require('lodash')
+const loadHtml = require('./curl-html')
 const downloader = new Downloader()
 
 const configScript = fs.readFileSync(path.join(__dirname, './config.js'))
@@ -20,16 +21,18 @@ const { window } = new JSDOM(`
 
 
 function getChapterUrls(bookUrl) {
-    return JSDOM.fromURL(bookUrl)
+    return loadHtml(bookUrl)
+        .then(c => new JSDOM(c))
         .then(({ window: root }) => {
             return [...root.document.querySelectorAll('div.chapter-list li a')]
-                .map(e => e.href)
+                .map(e => 'https://www.manhuagui.com' + e.href)
         })
 }
 
 
 function getChapterData(chapterUrl) {
-    return JSDOM.fromURL(chapterUrl)
+    return loadHtml(chapterUrl)
+        .then(c => new JSDOM(c))
         .then(({ window: root }) => {
             let script = [...root.document.querySelectorAll('script:not([src])')]
                 .filter(s => /window.+fromCharCode/.test(s.innerHTML))[0].innerHTML.trim();
@@ -98,5 +101,6 @@ getChapterUrls(process.argv[2])
     .then(async (chapterUrls) => {
         for (let chapterUrl of chapterUrls) {
             await getChapterData(chapterUrl).then(downloadChapter)
+            // await getChapterData(chapterUrl).then(console.log)
         }
     })
