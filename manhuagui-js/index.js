@@ -79,6 +79,7 @@ async function downloadChapter(chapterData) {
 
     await zipDirectory(folderPath, folderPath + '.zip')
     rimraf.sync(folderPath)
+    console.log(`downloaded ${chapterData.book}/${chapterData.chapter}`)
 
     function zipDirectory(source, out) {
         const archive = archiver('zip', { zlib: { level: 9 } })
@@ -97,10 +98,20 @@ async function downloadChapter(chapterData) {
     }
 }
 
+const downloadedChaptersPath = path.join('out', 'downloaded-chapters.json')
+let downloadedChapters = new Set(fs.existsSync(downloadedChaptersPath) ? JSON.parse(fs.readFileSync(downloadedChaptersPath)) : [])
+const saveDownloadedChapters = () => fs.writeFileSync(downloadedChaptersPath, JSON.stringify([...downloadedChapters]))
+process.on('SIGINT', saveDownloadedChapters)
+
 getChapterUrls(process.argv[2])
     .then(async (chapterUrls) => {
         for (let chapterUrl of chapterUrls) {
+            if (downloadedChapters.has(chapterUrl)) {
+                continue
+            }
             await getChapterData(chapterUrl).then(downloadChapter)
+            downloadedChapters.add(chapterUrl)
             // await getChapterData(chapterUrl).then(console.log)
         }
     })
+    .finally(saveDownloadedChapters)
