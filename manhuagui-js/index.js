@@ -71,7 +71,7 @@ async function downloadChapter(chapterData) {
     const folderPath = path.join('out', chapterData.book, chapterData.chapter)
 
     for (let image of chapterData.images) {
-        downloader.download(
+        await downloader.download(
             image.url,
             path.join(folderPath, image.name),
             headers)
