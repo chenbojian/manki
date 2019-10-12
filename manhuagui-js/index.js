@@ -6,6 +6,7 @@ const fs = require('fs')
 const rimraf = require('rimraf')
 const _ = require('lodash')
 const loadHtml = require('./curl-html')
+const PromisePool = require('es6-promise-pool')
 const downloader = new Downloader()
 
 const configScript = fs.readFileSync(path.join(__dirname, './config.js'))
@@ -70,12 +71,18 @@ async function downloadChapter(chapterData) {
     }
     const folderPath = path.join('out', chapterData.book, chapterData.chapter)
 
-    for (let image of chapterData.images) {
-        await downloader.download(
-            image.url,
-            path.join(folderPath, image.name),
-            headers)
+    function* generateDownloadPromises() {
+        for (let image of chapterData.images) {
+            yield downloader.download(
+                image.url,
+                path.join(folderPath, image.name),
+                headers)
+        }
     }
+
+    const pool = new PromisePool(generateDownloadPromises(), 3)
+
+    await pool.start()
 
     await zipDirectory(folderPath, folderPath + '.zip')
     rimraf.sync(folderPath)

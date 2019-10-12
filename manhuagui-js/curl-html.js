@@ -5,7 +5,7 @@ const mkdir = util.promisify(fs.mkdir)
 
 function loadHtml(url) {
     const options = [
-        '-H', 'Cookie: _ga=GA1.2.1772023635.1570682783; _gat=1; _gid=GA1.2.872753816.1570682783; country=TW',
+        '-H', 'Cookie: _ga=GA1.2.1772023635.1570682783; _gat=1; _gid=GA1.2.872753816.1570682783; country=TW; isAdult=1',
         '-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         '-H', 'Host: www.manhuagui.com',
         '-H', 'Referer: https://www.manhuagui.com/',
