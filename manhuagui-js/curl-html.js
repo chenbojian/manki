@@ -32,7 +32,7 @@ function loadHtml(url) {
             if (code === 0) {
                 resolve(out)
             } else {
-                reject(`out: ${out} \n error: ${error}`)
+                reject(`curl ${url} failed \n out: ${out} \n error: ${error}`)
             }
         })
     })
