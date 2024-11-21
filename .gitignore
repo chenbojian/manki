@@ -4,3 +4,5 @@ db.json
 .vscode
 node_modules/
 .DS_Store
+.yarn/
+.yarnrc.yml
