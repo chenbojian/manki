@@ -47,7 +47,7 @@ async function downloadBook(html) {
         }
         // console.log(chapterData)
         await retry(downloadChapter)(chapterData)
-        break
+        // break
     }
 }
 
