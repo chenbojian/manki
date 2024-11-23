@@ -1,11 +1,11 @@
 const { JSDOM } = require('jsdom')
 const path = require('path')
-const Downloader = require('./curl-image-downloader')
+const Downloader = require('../common/axios-image-downloader')
 const archiver = require('archiver')
 const fs = require('fs')
 const rimraf = require('rimraf')
 const _ = require('lodash')
-const loadHtml = require('./curl-html')
+const loadHtml = require('../common/axios-html')
 const PromisePool = require('es6-promise-pool')
 const downloader = new Downloader()
 
@@ -25,8 +25,6 @@ async function downloadBook(html) {
             chapterUrl: 'https://www.veryim.com' + c.href,
             images: []
         }
-        // console.log(chapterData)
-        // break
         if (isChapterDownloaded(chapterData)) {
             console.log(`skipped ${chapterData.book}/${chapterData.chapter}`)
             continue;
@@ -37,14 +35,19 @@ async function downloadBook(html) {
         const imgUrls = Buffer.from(qTcms_S_m_murl_e, 'base64').toString().split('$qingtiandy$')
 
         for (let i = 0; i < imgUrls.length; i++) {
-            const imgUrl = imgUrls[i]
+            let imgUrl = imgUrls[i]
+            if (imgUrl.startsWith('https://cdn1.npdn.top')) {
+                imgUrl = imgUrl.replace('https://cdn1.npdn.top', 'https://cdn2.npdn.top')
+            }
             const fileExt = (/(\.[^\.]+)$/.exec(imgUrl))[1]
             chapterData.images.push({
                 name: stringify(i + 1, 10) + fileExt,
                 url: imgUrl
             })
         }
+        // console.log(chapterData)
         await retry(downloadChapter)(chapterData)
+        break
     }
 }
 
